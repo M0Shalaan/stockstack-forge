@@ -11,6 +11,7 @@ import Transactions from "./pages/Transactions";
 import StockAlerts from "./pages/StockAlerts";
 import { AppLayout } from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="warehouses" element={<Warehouses />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="alerts" element={<StockAlerts />} />
+            <Route path="settings" element={<Settings />} />
             <Route index element={<Dashboard />} />
           </Route>
           <Route path="/dashboard" element={<AppLayout />}>
