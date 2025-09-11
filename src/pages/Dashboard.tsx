@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Loader2 } from "lucide-react"
 import {
   Package,
   Warehouse,
@@ -13,102 +15,122 @@ import {
   Activity,
   FileText,
 } from "lucide-react"
+import { api, apiConfig } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/AuthContext"
 
-const stats = [
-  {
-    title: "Total Products",
-    value: "1,247",
-    change: "+12%",
-    icon: Package,
-    color: "text-primary",
-  },
-  {
-    title: "Active Warehouses",
-    value: "8",
-    change: "+2",
-    icon: Warehouse,
-    color: "text-success",
-  },
-  {
-    title: "Monthly Sales",
-    value: "$45,231",
-    change: "+23%",
-    icon: DollarSign,
-    color: "text-warning",
-  },
-  {
-    title: "Low Stock Items",
-    value: "23",
-    change: "-5",
-    icon: AlertTriangle,
-    color: "text-destructive",
-  },
-]
+interface Product {
+  _id: string;
+  name: string;
+  sku: string;
+  price: number;
+  minQuantity?: number;
+}
 
-const recentTransactions = [
-  {
-    id: "TXN-001",
-    type: "Sale",
-    product: "MacBook Pro 16\"",
-    quantity: 2,
-    amount: "$3,998",
-    warehouse: "Main Warehouse",
-    time: "2 min ago",
-  },
-  {
-    id: "TXN-002",
-    type: "Purchase",
-    product: "iPhone 15 Pro",
-    quantity: 50,
-    amount: "$49,950",
-    warehouse: "Electronics Store",
-    time: "15 min ago",
-  },
-  {
-    id: "TXN-003",
-    type: "Transfer",
-    product: "Samsung Galaxy S24",
-    quantity: 10,
-    amount: "-",
-    warehouse: "Main → Branch A",
-    time: "1 hour ago",
-  },
-  {
-    id: "TXN-004",
-    type: "Sale",
-    product: "iPad Air",
-    quantity: 1,
-    amount: "$599",
-    warehouse: "Branch B",
-    time: "2 hours ago",
-  },
-]
+interface WarehouseData {
+  _id: string;
+  name: string;
+  code: string;
+}
 
-const lowStockItems = [
-  {
-    name: "iPhone 15 Pro Max",
-    sku: "APL-IP15PM-256",
-    current: 5,
-    minimum: 20,
-    warehouse: "Main Warehouse",
-  },
-  {
-    name: "MacBook Air M3",
-    sku: "APL-MBA-M3-512",
-    current: 2,
-    minimum: 10,
-    warehouse: "Electronics Store",
-  },
-  {
-    name: "Samsung Galaxy Watch",
-    sku: "SAM-GW6-44MM",
-    current: 8,
-    minimum: 25,
-    warehouse: "Branch A",
-  },
-]
+interface Transaction {
+  _id: string;
+  type: 'sale' | 'purchase' | 'transfer';
+  productId: string;
+  quantity: number;
+  price?: number;
+  warehouseId: string;
+  createdAt: string;
+  notes?: string;
+}
 
 export default function Dashboard() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseData[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    if (!apiConfig.isConfigured()) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      const [productsData, warehousesData, transactionsData] = await Promise.all([
+        api.list<Product>('products'),
+        api.list<WarehouseData>('warehouses'),
+        api.list<Transaction>('transactions')
+      ])
+      setProducts(productsData)
+      setWarehouses(warehousesData)
+      setTransactions(transactionsData.slice(0, 5)) // Latest 5 transactions
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!apiConfig.isConfigured()) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Welcome! Please configure your API settings in Settings to get started.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const totalProducts = products.length
+  const activeWarehouses = warehouses.length
+  const monthlySales = transactions
+    .filter(t => t.type === 'sale')
+    .reduce((sum, t) => sum + (t.price || 0) * t.quantity, 0)
+  const lowStockItems = products.filter(p => p.minQuantity && products.length < p.minQuantity).length
+
+  const recentTransactions = transactions.map(transaction => {
+    const product = products.find(p => p._id === transaction.productId)
+    const warehouse = warehouses.find(w => w._id === transaction.warehouseId)
+    return {
+      id: transaction._id,
+      type: transaction.type === 'sale' ? 'Sale' : transaction.type === 'purchase' ? 'Purchase' : 'Transfer',
+      product: product?.name || 'Unknown Product',
+      quantity: transaction.quantity,
+      amount: transaction.price ? `$${(transaction.price * transaction.quantity).toLocaleString()}` : '-',
+      warehouse: warehouse?.name || 'Unknown Warehouse',
+      time: new Date(transaction.createdAt).toLocaleString()
+    }
+  })
+
+  const lowStockProducts = products
+    .filter(p => p.minQuantity && products.length < p.minQuantity)
+    .slice(0, 3)
+    .map(product => ({
+      name: product.name,
+      sku: product.sku,
+      current: 0, // Would need actual stock data
+      minimum: product.minQuantity || 0,
+      warehouse: 'Various'
+    }))
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -121,23 +143,46 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title} className="shadow-enterprise-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
-                <span className={stat.change.startsWith('+') ? 'text-success' : 'text-destructive'}>
-                  {stat.change}
-                </span>{' '}
-                from last month
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="shadow-enterprise-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+            <Package className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProducts.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Active products</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-enterprise-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Warehouses</CardTitle>
+            <Warehouse className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeWarehouses}</div>
+            <p className="text-xs text-muted-foreground">Warehouse locations</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-enterprise-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
+            <DollarSign className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${monthlySales.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">This month</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-enterprise-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lowStockItems}</div>
+            <p className="text-xs text-muted-foreground">Need attention</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -198,7 +243,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {lowStockItems.map((item, index) => (
+              {lowStockProducts.length > 0 ? lowStockProducts.map((item, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -212,11 +257,16 @@ export default function Dashboard() {
                     </Badge>
                   </div>
                   <Progress
-                    value={(item.current / item.minimum) * 100}
+                    value={Math.min((item.current / item.minimum) * 100, 100)}
                     className="h-2"
                   />
                 </div>
-              ))}
+              )) : (
+                <div className="text-center text-muted-foreground py-4">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No low stock items</p>
+                </div>
+              )}
             </div>
             <Button variant="outline" className="w-full mt-4">
               View All Alerts

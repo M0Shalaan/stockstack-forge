@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
+import Categories from "./pages/Categories";
 import Warehouses from "./pages/Warehouses";
 import Transactions from "./pages/Transactions";
 import StockAlerts from "./pages/StockAlerts";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/app" element={<AppLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="products" element={<Products />} />
+            <Route path="categories" element={<Categories />} />
             <Route path="warehouses" element={<Warehouses />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="alerts" element={<StockAlerts />} />

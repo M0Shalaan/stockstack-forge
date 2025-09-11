@@ -4,113 +4,77 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
-import { AlertTriangle, Search, Package, Warehouse, ShoppingCart } from "lucide-react"
-import { useState } from "react"
+import { AlertTriangle, Search, Package, Warehouse, ShoppingCart, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { api, apiConfig } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
-// Mock data for low stock items
-const lowStockItems = [
-  {
-    id: 1,
-    name: "iPhone 15 Pro Max",
-    sku: "APL-IP15PM-256",
-    category: "Electronics",
-    currentStock: 3,
-    minimumQuantity: 20,
-    warehouse: "Main Warehouse",
-    lastRestocked: "2024-01-10",
-    supplier: "Apple Supplier Inc",
-    averageDailySales: 2.5,
-    daysUntilStockout: 1,
-    priority: "Critical",
-  },
-  {
-    id: 2,
-    name: "MacBook Air M3",
-    sku: "APL-MBA-M3-512",
-    category: "Electronics",
-    currentStock: 2,
-    minimumQuantity: 10,
-    warehouse: "Electronics Store",
-    lastRestocked: "2024-01-08",
-    supplier: "Apple Supplier Inc",
-    averageDailySales: 1.2,
-    daysUntilStockout: 2,
-    priority: "Critical",
-  },
-  {
-    id: 3,
-    name: "Samsung Galaxy Watch 6",
-    sku: "SAM-GW6-44MM",
-    category: "Electronics",
-    currentStock: 8,
-    minimumQuantity: 25,
-    warehouse: "Branch A",
-    lastRestocked: "2024-01-05",
-    supplier: "Samsung Electronics",
-    averageDailySales: 1.8,
-    daysUntilStockout: 4,
-    priority: "High",
-  },
-  {
-    id: 4,
-    name: "Dell XPS 13",
-    sku: "DELL-XPS13-512",
-    category: "Electronics",
-    currentStock: 1,
-    minimumQuantity: 5,
-    warehouse: "Branch A",
-    lastRestocked: "2024-01-12",
-    supplier: "Dell Technologies",
-    averageDailySales: 0.8,
-    daysUntilStockout: 1,
-    priority: "Critical",
-  },
-  {
-    id: 5,
-    name: "iPad Air 5th Gen",
-    sku: "APL-IPAD-AIR5-256",
-    category: "Electronics",
-    currentStock: 12,
-    minimumQuantity: 30,
-    warehouse: "Main Warehouse",
-    lastRestocked: "2024-01-07",
-    supplier: "Apple Supplier Inc",
-    averageDailySales: 2.1,
-    daysUntilStockout: 6,
-    priority: "Medium",
-  },
-  {
-    id: 6,
-    name: "AirPods Pro 2nd Gen",
-    sku: "APL-APP-PRO2",
-    category: "Electronics",
-    currentStock: 5,
-    minimumQuantity: 50,
-    warehouse: "Electronics Store",
-    lastRestocked: "2024-01-09",
-    supplier: "Apple Supplier Inc",
-    averageDailySales: 5.2,
-    daysUntilStockout: 1,
-    priority: "Critical",
-  },
-  {
-    id: 7,
-    name: "Microsoft Surface Pro 9",
-    sku: "MS-SP9-512",
-    category: "Electronics",
-    currentStock: 6,
-    minimumQuantity: 15,
-    warehouse: "Branch B",
-    lastRestocked: "2024-01-11",
-    supplier: "Microsoft Corp",
-    averageDailySales: 1.0,
-    daysUntilStockout: 6,
-    priority: "Medium",
-  },
-]
+interface Product {
+  _id: string;
+  name: string;
+  sku: string;
+  category?: string;
+  minQuantity?: number;
+}
+
+interface StockItem {
+  product: Product;
+  currentStock: number;
+  priority: 'Critical' | 'High' | 'Medium';
+}
 
 export default function StockAlerts() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    loadProducts()
+  }, [])
+
+  const loadProducts = async () => {
+    if (!apiConfig.isConfigured()) {
+      toast({
+        title: "API Not Configured",
+        description: "Please configure your API settings first",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const data = await api.list<Product>('products')
+      setProducts(data)
+    } catch (error) {
+      toast({
+        title: "Error Loading Products",
+        description: error instanceof Error ? error.message : "Failed to load products",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Mock low stock items based on products (in real app, this would come from stock data)
+  const lowStockItems = products
+    .filter(product => product.minQuantity)
+    .map(product => ({
+      id: product._id,
+      name: product.name,
+      sku: product.sku,
+      category: product.category || 'Electronics',
+      currentStock: Math.floor(Math.random() * (product.minQuantity! / 2)), // Simulate low stock
+      minimumQuantity: product.minQuantity!,
+      warehouse: 'Main Warehouse',
+      lastRestocked: '2024-01-10',
+      supplier: 'Supplier Inc',
+      averageDailySales: Math.random() * 5,
+      daysUntilStockout: Math.floor(Math.random() * 7) + 1,
+      priority: Math.random() > 0.7 ? 'Critical' : Math.random() > 0.4 ? 'High' : 'Medium' as const,
+    }))
 
   const filteredItems = lowStockItems.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,6 +103,14 @@ export default function StockAlerts() {
   const highPriorityItems = lowStockItems.filter(item => item.priority === "High").length
   const mediumPriorityItems = lowStockItems.filter(item => item.priority === "Medium").length
   const totalValue = lowStockItems.reduce((sum, item) => sum + (item.currentStock * 500), 0) // Estimated value
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,68 +7,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Edit, Trash2, Warehouse, MapPin, Package } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Warehouse, MapPin, Package, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { api, apiConfig } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
 
-// Mock data
-const warehouses = [
-  {
-    id: 1,
-    name: "Main Warehouse",
-    code: "MW-001",
-    address: "123 Industrial Blvd, Metro City, MC 12345",
-    manager: "John Smith",
-    phone: "+1 (555) 123-4567",
-    email: "john.smith@company.com",
-    capacity: 10000,
-    currentStock: 7543,
-    productsCount: 245,
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Electronics Store",
-    code: "ES-002",
-    address: "456 Tech Avenue, Digital District, DD 23456",
-    manager: "Sarah Johnson",
-    phone: "+1 (555) 234-5678",
-    email: "sarah.johnson@company.com",
-    capacity: 5000,
-    currentStock: 3892,
-    productsCount: 158,
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Branch A",
-    code: "BA-003",
-    address: "789 Commerce Street, Business Bay, BB 34567",
-    manager: "Mike Davis",
-    phone: "+1 (555) 345-6789",
-    email: "mike.davis@company.com",
-    capacity: 3000,
-    currentStock: 1456,
-    productsCount: 89,
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Overflow Storage",
-    code: "OS-004",
-    address: "321 Storage Lane, Warehouse District, WD 45678",
-    manager: "Lisa Wilson",
-    phone: "+1 (555) 456-7890",
-    email: "lisa.wilson@company.com",
-    capacity: 8000,
-    currentStock: 234,
-    productsCount: 12,
-    status: "Low Activity",
-  },
-]
+interface WarehouseType {
+  _id: string;
+  name: string;
+  code: string;
+  address: string;
+  manager?: string;
+  phone?: string;
+  email?: string;
+  capacity?: number;
+}
 
 export default function Warehouses() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [warehouses, setWarehouses] = useState<WarehouseType[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [newWarehouse, setNewWarehouse] = useState({
     name: "",
     code: "",
@@ -79,45 +39,119 @@ export default function Warehouses() {
     capacity: "",
   })
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
+
+  useEffect(() => {
+    loadWarehouses()
+  }, [])
+
+  const loadWarehouses = async () => {
+    if (!apiConfig.isConfigured()) {
+      toast({
+        title: "API Not Configured",
+        description: "Please configure your API settings first",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const data = await api.list<WarehouseType>('warehouses')
+      setWarehouses(data)
+    } catch (error) {
+      toast({
+        title: "Error Loading Warehouses",
+        description: error instanceof Error ? error.message : "Failed to load warehouses",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredWarehouses = warehouses.filter(warehouse =>
     warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     warehouse.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    warehouse.manager.toLowerCase().includes(searchTerm.toLowerCase())
+    (warehouse.manager && warehouse.manager.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  const handleAddWarehouse = () => {
-    toast({
-      title: "Warehouse Added",
-      description: `${newWarehouse.name} has been added successfully.`,
-    })
-    setIsDialogOpen(false)
-    setNewWarehouse({
-      name: "",
-      code: "",
-      address: "",
-      manager: "",
-      phone: "",
-      email: "",
-      capacity: "",
-    })
-  }
+  const handleAddWarehouse = async () => {
+    if (!hasPermission(['admin', 'manager'])) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to add warehouses",
+        variant: "destructive",
+      })
+      return
+    }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Badge variant="default" className="bg-success text-success-foreground">Active</Badge>
-      case "Low Activity":
-        return <Badge variant="secondary" className="bg-warning text-warning-foreground">Low Activity</Badge>
-      case "Inactive":
-        return <Badge variant="destructive">Inactive</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
+    setSubmitting(true)
+    try {
+      const warehouseData = {
+        ...newWarehouse,
+        capacity: parseInt(newWarehouse.capacity) || undefined,
+      }
+      
+      await api.create<WarehouseType>('warehouses', warehouseData)
+      toast({
+        title: "Warehouse Added",
+        description: `${newWarehouse.name} has been added successfully.`,
+      })
+      setIsDialogOpen(false)
+      setNewWarehouse({
+        name: "",
+        code: "",
+        address: "",
+        manager: "",
+        phone: "",
+        email: "",
+        capacity: "",
+      })
+      loadWarehouses() // Reload warehouses
+    } catch (error) {
+      toast({
+        title: "Error Adding Warehouse",
+        description: error instanceof Error ? error.message : "Failed to add warehouse",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const getCapacityPercentage = (current: number, capacity: number) => {
-    return Math.round((current / capacity) * 100)
+  const handleDeleteWarehouse = async (id: string) => {
+    if (!hasPermission(['admin', 'manager'])) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to delete warehouses",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await api.remove('warehouses', id)
+      toast({
+        title: "Warehouse Deleted",
+        description: "Warehouse has been deleted successfully",
+      })
+      loadWarehouses()
+    } catch (error) {
+      toast({
+        title: "Error Deleting Warehouse",
+        description: error instanceof Error ? error.message : "Failed to delete warehouse",
+        variant: "destructive",
+      })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -130,13 +164,14 @@ export default function Warehouses() {
             Manage your warehouse locations and storage capacity
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Warehouse
-            </Button>
-          </DialogTrigger>
+        {hasPermission(['admin', 'manager']) && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Add Warehouse
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add New Warehouse</DialogTitle>
@@ -219,13 +254,23 @@ export default function Warehouses() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button onClick={handleAddWarehouse}>Add Warehouse</Button>
+              <Button onClick={handleAddWarehouse} disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Warehouse"
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -243,9 +288,7 @@ export default function Warehouses() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-success" />
-              <div className="text-2xl font-bold">
-                {warehouses.filter(w => w.status === "Active").length}
-              </div>
+              <div className="text-2xl font-bold">{warehouses.length}</div>
             </div>
             <p className="text-xs text-muted-foreground">Active</p>
           </CardContent>
@@ -255,7 +298,7 @@ export default function Warehouses() {
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-warning" />
               <div className="text-2xl font-bold">
-                {warehouses.reduce((sum, w) => sum + w.capacity, 0).toLocaleString()}
+                {warehouses.reduce((sum, w) => sum + (w.capacity || 0), 0).toLocaleString()}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Total Capacity</p>
@@ -265,9 +308,7 @@ export default function Warehouses() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-primary" />
-              <div className="text-2xl font-bold">
-                {warehouses.reduce((sum, w) => sum + w.currentStock, 0).toLocaleString()}
-              </div>
+              <div className="text-2xl font-bold">N/A</div>
             </div>
             <p className="text-xs text-muted-foreground">Current Stock</p>
           </CardContent>
@@ -315,7 +356,7 @@ export default function Warehouses() {
             </TableHeader>
             <TableBody>
               {filteredWarehouses.map((warehouse) => (
-                <TableRow key={warehouse.id}>
+                <TableRow key={warehouse._id}>
                   <TableCell>
                     <div>
                       <div className="font-medium">{warehouse.name}</div>
@@ -326,35 +367,43 @@ export default function Warehouses() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{warehouse.manager}</div>
-                      <div className="text-sm text-muted-foreground">{warehouse.email}</div>
+                      <div className="font-medium">{warehouse.manager || 'N/A'}</div>
+                      <div className="text-sm text-muted-foreground">{warehouse.email || 'N/A'}</div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{warehouse.phone}</TableCell>
+                  <TableCell className="text-muted-foreground">{warehouse.phone || 'N/A'}</TableCell>
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {warehouse.currentStock.toLocaleString()} / {warehouse.capacity.toLocaleString()}
+                        N/A / {warehouse.capacity?.toLocaleString() || 'N/A'}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {getCapacityPercentage(warehouse.currentStock, warehouse.capacity)}% used
+                        Capacity available
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{warehouse.productsCount} items</Badge>
+                    <Badge variant="outline">N/A items</Badge>
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(warehouse.status)}
+                    <Badge variant="default" className="bg-success text-success-foreground">Active</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {hasPermission(['admin', 'manager']) && (
+                        <>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteWarehouse(warehouse._id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
