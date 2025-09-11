@@ -1,9 +1,10 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
 import { Outlet } from "react-router-dom"
-import { Bell, User } from "lucide-react"
+import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { UserProfile } from "@/components/UserProfile"
 
 export function AppLayout() {
   return (
@@ -26,10 +27,7 @@ export function AppLayout() {
                   3
                 </Badge>
               </Button>
-              <Button variant="ghost" size="sm">
-                <User className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">Admin User</span>
-              </Button>
+              <UserProfile />
             </div>
           </header>
 

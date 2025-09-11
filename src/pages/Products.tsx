@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,70 +8,35 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { api, apiConfig } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
 
-// Mock data
-const products = [
-  {
-    id: 1,
-    name: "MacBook Pro 16\"",
-    sku: "APL-MBP16-1TB",
-    barcode: "123456789012",
-    category: "Electronics",
-    price: 2499.99,
-    stock: 15,
-    minQuantity: 5,
-    warehouse: "Main Warehouse",
-    status: "In Stock",
-    expirationDate: null,
-  },
-  {
-    id: 2,
-    name: "iPhone 15 Pro Max",
-    sku: "APL-IP15PM-256",
-    barcode: "123456789013",
-    category: "Electronics",
-    price: 1199.99,
-    stock: 3,
-    minQuantity: 20,
-    warehouse: "Main Warehouse",
-    status: "Low Stock",
-    expirationDate: null,
-  },
-  {
-    id: 3,
-    name: "Samsung Galaxy S24 Ultra",
-    sku: "SAM-GS24U-512",
-    barcode: "123456789014",
-    category: "Electronics",
-    price: 1299.99,
-    stock: 28,
-    minQuantity: 10,
-    warehouse: "Electronics Store",
-    status: "In Stock",
-    expirationDate: null,
-  },
-  {
-    id: 4,
-    name: "Dell XPS 13",
-    sku: "DELL-XPS13-512",
-    barcode: "123456789015",
-    category: "Electronics",
-    price: 1099.99,
-    stock: 0,
-    minQuantity: 5,
-    warehouse: "Branch A",
-    status: "Out of Stock",
-    expirationDate: null,
-  },
-]
+interface Product {
+  _id: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  category?: string;
+  price: number;
+  minQuantity?: number;
+  description?: string;
+  imageUrl?: string;
+}
 
-const categories = ["Electronics", "Clothing", "Books", "Home & Garden", "Sports", "Other"]
+interface Category {
+  _id: string;
+  name: string;
+}
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [newProduct, setNewProduct] = useState({
     name: "",
     sku: "",
@@ -82,37 +47,131 @@ export default function Products() {
     description: "",
   })
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
+
+  // Check if user can add products (admin/manager only)
+  const canAddProducts = hasPermission(['admin', 'manager'])
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    if (!apiConfig.isConfigured()) {
+      toast({
+        title: "API Not Configured",
+        description: "Please configure your API settings first",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        api.list<Product>('products', searchTerm),
+        api.list<Category>('categories')
+      ])
+      setProducts(productsData)
+      setCategories(categoriesData)
+    } catch (error) {
+      toast({
+        title: "Error Loading Data",
+        description: error instanceof Error ? error.message : "Failed to load products",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddProduct = () => {
-    toast({
-      title: "Product Added",
-      description: `${newProduct.name} has been added successfully.`,
-    })
-    setIsDialogOpen(false)
-    setNewProduct({
-      name: "",
-      sku: "",
-      barcode: "",
-      category: "",
-      price: "",
-      minQuantity: "",
-      description: "",
-    })
+  const handleAddProduct = async () => {
+    if (!canAddProducts) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to add products",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const productData = {
+        ...newProduct,
+        price: parseFloat(newProduct.price) || 0,
+        minQuantity: parseInt(newProduct.minQuantity) || 0,
+      }
+      
+      await api.create<Product>('products', productData)
+      toast({
+        title: "Product Added",
+        description: `${newProduct.name} has been added successfully.`,
+      })
+      setIsDialogOpen(false)
+      setNewProduct({
+        name: "",
+        sku: "",
+        barcode: "",
+        category: "",
+        price: "",
+        minQuantity: "",
+        description: "",
+      })
+      loadData() // Reload products
+    } catch (error) {
+      toast({
+        title: "Error Adding Product",
+        description: error instanceof Error ? error.message : "Failed to add product",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const getStatusBadge = (status: string, stock: number, minQuantity: number) => {
-    if (stock === 0) {
-      return <Badge variant="destructive">Out of Stock</Badge>
-    } else if (stock <= minQuantity) {
-      return <Badge variant="secondary" className="bg-warning text-warning-foreground">Low Stock</Badge>
-    } else {
-      return <Badge variant="default" className="bg-success text-success-foreground">In Stock</Badge>
+  const handleDeleteProduct = async (id: string) => {
+    if (!hasPermission(['admin', 'manager'])) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to delete products",
+        variant: "destructive",
+      })
+      return
     }
+
+    try {
+      await api.remove('products', id)
+      toast({
+        title: "Product Deleted",
+        description: "Product has been deleted successfully",
+      })
+      loadData()
+    } catch (error) {
+      toast({
+        title: "Error Deleting Product",
+        description: error instanceof Error ? error.message : "Failed to delete product",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getStatusBadge = (product: Product) => {
+    // Since we don't have stock data in the product model, show based on existence
+    return <Badge variant="default" className="bg-success text-success-foreground">Available</Badge>
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -125,13 +184,14 @@ export default function Products() {
             Manage your product inventory and stock levels
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Product
-            </Button>
-          </DialogTrigger>
+        {canAddProducts && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Add Product
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
@@ -181,8 +241,8 @@ export default function Products() {
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
+                        <SelectItem key={category._id} value={category._id}>
+                          {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -223,13 +283,23 @@ export default function Products() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button onClick={handleAddProduct}>Add Product</Button>
+              <Button onClick={handleAddProduct} disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Product"
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -247,9 +317,7 @@ export default function Products() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-warning" />
-              <div className="text-2xl font-bold">
-                {products.filter(p => p.stock <= p.minQuantity).length}
-              </div>
+              <div className="text-2xl font-bold">0</div>
             </div>
             <p className="text-xs text-muted-foreground">Low Stock Items</p>
           </CardContent>
@@ -258,9 +326,7 @@ export default function Products() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-destructive" />
-              <div className="text-2xl font-bold">
-                {products.filter(p => p.stock === 0).length}
-              </div>
+              <div className="text-2xl font-bold">0</div>
             </div>
             <p className="text-xs text-muted-foreground">Out of Stock</p>
           </CardContent>
@@ -270,7 +336,7 @@ export default function Products() {
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-success" />
               <div className="text-2xl font-bold">
-                ${products.reduce((sum, p) => sum + (p.price * p.stock), 0).toLocaleString()}
+                ${products.reduce((sum, p) => sum + p.price, 0).toLocaleString()}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Total Inventory Value</p>
@@ -320,31 +386,34 @@ export default function Products() {
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
+                <TableRow key={product._id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell className="text-muted-foreground">{product.sku}</TableCell>
-                  <TableCell>{product.category}</TableCell>
+                  <TableCell>
+                    {categories.find(c => c._id === product.category)?.name || 'N/A'}
+                  </TableCell>
                   <TableCell>${product.price.toLocaleString()}</TableCell>
+                  <TableCell>N/A</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{product.stock}</span>
-                      {product.stock <= product.minQuantity && (
-                        <AlertTriangle className="w-4 h-4 text-warning" />
-                      )}
-                    </div>
+                    {getStatusBadge(product)}
                   </TableCell>
-                  <TableCell>
-                    {getStatusBadge(product.status, product.stock, product.minQuantity)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{product.warehouse}</TableCell>
+                  <TableCell className="text-muted-foreground">N/A</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {hasPermission(['admin', 'manager']) && (
+                        <>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product._id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
