@@ -1,45 +1,84 @@
-# Inventory Backend (MongoDB + Express)
+# IMS MongoDB Backend API
 
-This is a minimal, production-ready backend scaffold for your Inventory Management System using MongoDB (Mongoose), Express, and JWT auth.
+A robust REST API for Inventory Management System built with Express.js, MongoDB, and TypeScript.
 
 ## Features
-- JWT authentication (register/login)
-- Role-based access (admin, manager, staff)
-- CRUD for products, warehouses, categories, parties (suppliers/customers)
-- Transactions (purchase, sale, transfer) with automatic stock adjustments
-- CORS, Helmet, request logging, environment-based config
+
+- **Authentication**: JWT-based auth with role-based access control (admin, manager, staff)
+- **CRUD Operations**: Full CRUD for products, warehouses, categories, parties, and transactions
+- **Stock Management**: Real-time stock tracking with automatic adjustments
+- **Validation**: Comprehensive input validation using Zod
+- **Error Handling**: Centralized error handling with detailed responses
+- **Security**: CORS, Helmet, and JWT token validation
+- **Pagination**: Built-in pagination for all list endpoints
 
 ## Quick Start
 
-1. Copy env file
+1. **Install dependencies:**
 ```bash
 cd backend
-cp .env.example .env
-# edit .env to set MONGO_URI, JWT_SECRET, CORS_ORIGINS
+npm install
+npm install zod@^3.25.76
 ```
 
-2. Install deps
+2. **Environment Setup:**
 ```bash
-npm i
+cp .env.example .env
+# Edit .env with your MongoDB URI and other settings
 ```
 
-3. Run dev server
+3. **Start Development Server:**
 ```bash
 npm run dev
 ```
 
-The API will run at http://localhost:4000
+## Environment Variables
 
-## Deploy
-- Vercel: Prefer a separate server (Railway/Render) for long-running Express. Otherwise convert to serverless functions.
-- Railway/Render/Hetzner: Push this folder as a separate project, set env vars, and expose port 4000.
+```env
+PORT=4000
+MONGO_URI=mongodb+srv://user:password@cluster.mongodb.net/ims
+JWT_SECRET=your_super_secret_jwt_key
+CORS_ORIGINS=http://localhost:5173,https://your-frontend-domain.com
+```
 
-## API Overview
-- Auth: POST /api/auth/register, POST /api/auth/login
-- Products: /api/products
-- Warehouses: /api/warehouses
-- Categories: /api/categories
-- Parties (suppliers/customers): /api/parties
-- Transactions: /api/transactions
+## API Endpoints
 
-See `openapi.yaml` for a starting specification.
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user  
+- `GET /api/auth/profile` - Get user profile
+
+### Products, Warehouses, Categories, Parties, Transactions
+- Standard CRUD operations with role-based permissions
+- Pagination and search support
+- Input validation
+
+### Stock Management
+- `GET /api/stock` - Get stock levels across warehouses
+- `GET /api/stock/alerts` - Get low stock alerts
+
+## Response Format
+
+```json
+{
+  "success": true,
+  "data": "...",
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 5,
+    "totalItems": 100
+  }
+}
+```
+
+## Features
+
+- Automatic stock adjustments for transactions
+- Database transactions for data consistency
+- Comprehensive error handling
+- Role-based access control
+- Input validation with Zod
+- MongoDB connection with retry logic
+- Graceful shutdown handling
+
+See `openapi.yaml` for detailed API specification.

@@ -6,6 +6,21 @@ export type ApiConfig = {
   token?: string; // JWT
 };
 
+export type ApiResponse<T> = {
+  success?: boolean;
+  data?: T;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  error?: string;
+  details?: Array<{ field: string; message: string }>;
+};
+
 const STORAGE_KEY = "ims.api.config";
 
 function readConfig(): ApiConfig {
@@ -61,10 +76,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(url, { ...options, headers });
   const text = await res.text();
   const data = text ? JSON.parse(text) : undefined;
+  
   if (!res.ok) {
     const message = (data && (data.error || data.message)) || `HTTP ${res.status}`;
     throw new Error(message);
   }
+  
+  // Handle new response format - return data if it's wrapped in success response
+  if (data && typeof data === 'object' && 'success' in data) {
+    return data.data !== undefined ? data.data : data;
+  }
+  
   return data as T;
 }
 
@@ -89,13 +111,47 @@ export const api = {
         body: JSON.stringify({ name, email, password, role }),
       }
     ),
+  
+  getProfile: () => 
+    request<{ user: { id: string; name: string; email: string; role: string } }>("/auth/profile"),
 
-  // Generic CRUD helpers (you can use these later in pages)
-  list: <T>(resource: string, q?: string) => request<T[]>(q ? `/${resource}?q=${encodeURIComponent(q)}` : `/${resource}`),
+  // Stock
+  getStockLevels: (warehouseId?: string) => 
+    request<Array<{ 
+      id: string; 
+      product: any; 
+      warehouse: any; 
+      quantity: number; 
+      isLowStock: boolean; 
+    }>>(warehouseId ? `/stock?warehouse=${warehouseId}` : "/stock"),
+    
+  getStockAlerts: () => 
+    request<Array<{ 
+      id: string; 
+      product: any; 
+      warehouse: any; 
+      quantity: number; 
+      isLowStock: boolean; 
+    }>>("/stock/alerts"),
+
+  // Generic CRUD helpers with pagination support
+  list: <T>(resource: string, q?: string, page?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    if (q) params.append('q', q);
+    if (page) params.append('page', page.toString());
+    if (limit) params.append('limit', limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<T[]>(`/${resource}${query}`);
+  },
+  
   get: <T>(resource: string, id: string) => request<T>(`/${resource}/${id}`),
+  
   create: <T>(resource: string, payload: unknown) =>
     request<T>(`/${resource}`, { method: "POST", body: JSON.stringify(payload) }),
+    
   update: <T>(resource: string, id: string, payload: unknown) =>
     request<T>(`/${resource}/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
-  remove: (resource: string, id: string) => request<{ ok: boolean }>(`/${resource}/${id}`, { method: "DELETE" }),
+    
+  remove: (resource: string, id: string) => 
+    request<{ success: boolean; message?: string }>(`/${resource}/${id}`, { method: "DELETE" }),
 };

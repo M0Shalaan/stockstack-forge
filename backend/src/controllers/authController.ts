@@ -2,24 +2,83 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { config } from '../config';
+import { asyncHandler, createApiError } from '../middleware/errorHandler';
 
 const sign = (user: any) => jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
 
-export async function register(req: Request, res: Response) {
+export const register = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, password, role } = req.body;
-  const exists = await User.findOne({ email });
-  if (exists) return res.status(400).json({ error: 'Email already in use' });
-  const user = await User.create({ name, email, password, role: role ?? 'manager' });
-  const token = sign(user);
-  res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-}
+  
+  // Check if user exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
+    throw createApiError('Email already in use', 400);
+  }
 
-export async function login(req: Request, res: Response) {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  const ok = await (user as any).comparePassword(password);
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+  // Create user
+  const user = await User.create({
+    name: name.trim(),
+    email: email.toLowerCase(),
+    password,
+    role: role || 'staff'
+  });
+
   const token = sign(user);
-  res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-}
+  
+  res.status(201).json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
+
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  
+  // Find user and include password for comparison
+  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  if (!user) {
+    throw createApiError('Invalid credentials', 401);
+  }
+
+  // Check password
+  const isPasswordValid = await user.comparePassword(password);
+  if (!isPasswordValid) {
+    throw createApiError('Invalid credentials', 401);
+  }
+
+  const token = sign(user);
+  
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
+
+export const getProfile = asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.user?.id).select('-password');
+  if (!user) {
+    throw createApiError('User not found', 404);
+  }
+
+  res.json({
+    success: true,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
