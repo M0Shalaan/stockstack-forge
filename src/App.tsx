@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
@@ -27,17 +28,34 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/app" element={<AppLayout />}>
+          <Route path="/app" element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }>
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="products" element={<Products />} />
-            <Route path="categories" element={<Categories />} />
-            <Route path="warehouses" element={<Warehouses />} />
-            <Route path="transactions" element={<Transactions />} />
+            <Route path="products" element={
+              <ProtectedRoute requiredRoles={['admin', 'manager', 'staff']}>
+                <Products />
+              </ProtectedRoute>
+            } />
+            <Route path="categories" element={
+              <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <Categories />
+              </ProtectedRoute>
+            } />
+            <Route path="warehouses" element={
+              <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <Warehouses />
+              </ProtectedRoute>
+            } />
+            <Route path="transactions" element={
+              <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <Transactions />
+              </ProtectedRoute>
+            } />
             <Route path="alerts" element={<StockAlerts />} />
             <Route path="settings" element={<Settings />} />
-            <Route index element={<Dashboard />} />
-          </Route>
-          <Route path="/dashboard" element={<AppLayout />}>
             <Route index element={<Dashboard />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -15,6 +15,7 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   hasPermission: (requiredRoles: string[]) => boolean;
+  isConfigured: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,16 +26,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is logged in on app start
-    const token = apiConfig.get().token;
-    if (token) {
-      // You could verify the token here by calling a /me endpoint
-      // For now, we'll just assume the token is valid
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
+    const initAuth = async () => {
+      const config = apiConfig.get();
+      
+      // Check if API is configured
+      if (!config.baseUrl) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user has token
+      if (!config.token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Verify token and get user profile
+        const response = await api.getProfile();
+        setUser(response.user as User);
+      } catch (error) {
+        console.error('Auth verification failed:', error);
+        // Clear invalid token
+        apiConfig.setToken(undefined);
+        toast({
+          title: "Session expired",
+          description: "Please log in again",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, [toast]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -69,8 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return requiredRoles.includes(user.role);
   };
 
+  const isConfigured = () => {
+    return apiConfig.isConfigured();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, hasPermission }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, hasPermission, isConfigured }}>
       {children}
     </AuthContext.Provider>
   );
