@@ -1,14 +1,26 @@
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, UserPlus, ArrowLeft } from "lucide-react"
-import { useNavigate, Link } from "react-router-dom"
-import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/contexts/AuthContext"
-import { api } from "../lib/api"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Eye, EyeOff, UserPlus, ArrowLeft } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "../lib/api";
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -16,126 +28,136 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "staff" as "admin" | "manager" | "staff"
-  })
+    role: "staff" as "admin" | "manager" | "staff",
+  });
 
   const [passwordVisible, setPasswordVisible] = useState({
     password: false,
-    confirmPassword: false
-  })
+    confirmPassword: false,
+  });
 
-  const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
-  const { toast } = useToast()
-  const { user, isConfigured } = useAuth()
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, isConfigured } = useAuth();
 
   // Redirect logic
   useEffect(() => {
     if (!isConfigured()) {
-      navigate("/login")
+      navigate("/login");
     } else if (user) {
-      navigate("/app/dashboard")
+      navigate("/app/dashboard");
     }
-  }, [user, navigate, isConfigured])
+  }, [user, navigate, isConfigured]);
 
   // SEO meta setup
   useEffect(() => {
-    document.title = "Register - Inventory Management System"
-    const meta = document.querySelector('meta[name="description"]')
-    const desc = "Create a new account for the Inventory Management System"
+    document.title = "Register - Inventory Management System";
+    const meta = document.querySelector('meta[name="description"]');
+    const desc = "Create a new account for the Inventory Management System";
     if (meta) {
-      meta.setAttribute("content", desc)
+      meta.setAttribute("content", desc);
     } else {
-      const m = document.createElement("meta")
-      m.name = "description"
-      m.content = desc
-      document.head.appendChild(m)
+      const m = document.createElement("meta");
+      m.name = "description";
+      m.content = desc;
+      document.head.appendChild(m);
     }
-  }, [])
+  }, []);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  const handleChange = (
+    field: "name" | "email" | "password" | "confirmPassword" | "role",
+    value: string
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const validateForm = (): boolean => {
-    const { name, email, password, confirmPassword } = formData
+    const { name, email, password, confirmPassword } = formData;
 
     if (!name.trim()) {
-      return showError("Name required", "Please enter your full name")
+      return showError("Name required", "Please enter your full name");
     }
 
     if (!email.trim()) {
-      return showError("Email required", "Please enter your email address")
+      return showError("Email required", "Please enter your email address");
     }
 
     if (password.length < 6) {
-      return showError("Password too short", "Password must be at least 6 characters long")
+      return showError(
+        "Password too short",
+        "Password must be at least 6 characters long"
+      );
     }
 
     if (password !== confirmPassword) {
-      return showError("Passwords don't match", "Please make sure both passwords are the same")
+      return showError(
+        "Passwords don't match",
+        "Please make sure both passwords are the same"
+      );
     }
 
-    return true
-  }
+    return true;
+  };
 
   const showError = (title: string, description: string) => {
-    toast({ title, description, variant: "destructive" })
-    return false
-  }
+    toast({ title, description, variant: "destructive" });
+    return false;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateForm()) return
+    e.preventDefault();
+    if (!validateForm()) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       await api.register(
         formData.name.trim(),
         formData.email.trim(),
         formData.password,
         formData.role
-      )
+      );
 
       toast({
         title: "Registration successful!",
         description: "Your account has been created. You can now log in.",
-      })
+      });
 
-      navigate("/login")
+      navigate("/login");
     } catch (error) {
       toast({
         title: "Registration failed",
-        description: error instanceof Error ? error.message : "Failed to create account",
+        description:
+          error instanceof Error ? error.message : "Failed to create account",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const PasswordField = ({
     id,
     label,
     value,
-    visibleKey,
-    placeholder
+    field,
+    placeholder,
   }: {
-    id: string
-    label: string
-    value: string
-    visibleKey: "password" | "confirmPassword"
-    placeholder: string
+    id: string;
+    label: string;
+    value: string;
+    field: "password" | "confirmPassword";
+    placeholder: string;
   }) => (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <div className="relative">
         <Input
           id={id}
-          type={passwordVisible[visibleKey] ? "text" : "password"}
+          type={passwordVisible[field] ? "text" : "password"}
           placeholder={placeholder}
           value={value}
-          onChange={(e) => handleChange(visibleKey, e.target.value)}
+          onChange={(e) => handleChange(field, e.target.value)}
           required
         />
         <Button
@@ -144,13 +166,13 @@ export default function Register() {
           size="sm"
           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
           onClick={() =>
-            setPasswordVisible(prev => ({
+            setPasswordVisible((prev) => ({
               ...prev,
-              [visibleKey]: !prev[visibleKey],
+              [field]: !prev[field],
             }))
           }
         >
-          {passwordVisible[visibleKey] ? (
+          {passwordVisible[field] ? (
             <EyeOff className="h-4 w-4" />
           ) : (
             <Eye className="h-4 w-4" />
@@ -158,7 +180,7 @@ export default function Register() {
         </Button>
       </div>
     </div>
-  )
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-secondary p-4">
@@ -169,7 +191,9 @@ export default function Register() {
               <UserPlus className="w-8 h-8 text-white" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                Create Account
+              </CardTitle>
               <CardDescription>
                 Join the Inventory Management System
               </CardDescription>
@@ -227,7 +251,7 @@ export default function Register() {
                 id="password"
                 label="Password"
                 value={formData.password}
-                visibleKey="password"
+                field="password"
                 placeholder="Enter your password"
               />
 
@@ -235,7 +259,7 @@ export default function Register() {
                 id="confirmPassword"
                 label="Confirm Password"
                 value={formData.confirmPassword}
-                visibleKey="confirmPassword"
+                field="confirmPassword"
                 placeholder="Confirm your password"
               />
 
@@ -248,7 +272,10 @@ export default function Register() {
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   Already have an account?{" "}
-                  <Link to="/login" className="text-primary hover:underline font-medium">
+                  <Link
+                    to="/login"
+                    className="text-primary hover:underline font-medium"
+                  >
                     Sign in here
                   </Link>
                 </p>
@@ -267,5 +294,5 @@ export default function Register() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

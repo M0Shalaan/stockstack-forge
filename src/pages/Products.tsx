@@ -1,38 +1,75 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Package,
+  AlertTriangle,
+  Loader2,
+  FolderPlus,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { api, apiConfig } from "@/lib/api"
 import { useAuth } from "@/contexts/AuthContext"
+import warehouse from "./Warehouses"
 
 interface Product {
-  _id: string;
-  name: string;
-  sku: string;
-  barcode?: string;
-  category?: string;
-  price: number;
-  minQuantity?: number;
-  description?: string;
-  imageUrl?: string;
+  _id: string
+  name: string
+  sku: string
+  barcode?: string
+  category?: string
+  price: number
+  minQuantity?: number
+  description?: string
+  imageUrl?: string
 }
 
 interface Category {
-  _id: string;
-  name: string;
+  _id: string
+  name: string
 }
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,12 +82,15 @@ export default function Products() {
     price: "",
     minQuantity: "",
     description: "",
+    warehouse: "",
   })
+  const [newCategory, setNewCategory] = useState("")
+
   const { toast } = useToast()
   const { hasPermission } = useAuth()
 
-  // Check if user can add products (admin/manager only)
-  const canAddProducts = hasPermission(['admin', 'manager'])
+  const canAddProducts = hasPermission(["admin", "manager"])
+  const canAddCategories = hasPermission(["admin", "manager"])
 
   useEffect(() => {
     loadData()
@@ -69,15 +109,16 @@ export default function Products() {
 
     try {
       const [productsData, categoriesData] = await Promise.all([
-        api.list<Product>('products', searchTerm),
-        api.list<Category>('categories')
+        api.list<Product>("products", searchTerm),
+        api.list<Category>("categories"),
       ])
       setProducts(productsData)
       setCategories(categoriesData)
     } catch (error) {
       toast({
         title: "Error Loading Data",
-        description: error instanceof Error ? error.message : "Failed to load products",
+        description:
+          error instanceof Error ? error.message : "Failed to load products",
         variant: "destructive",
       })
     } finally {
@@ -85,9 +126,10 @@ export default function Products() {
     }
   }
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.sku.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handleAddProduct = async () => {
@@ -107,27 +149,66 @@ export default function Products() {
         price: parseFloat(newProduct.price) || 0,
         minQuantity: parseInt(newProduct.minQuantity) || 0,
       }
-      
-      await api.create<Product>('products', productData)
+
+      await api.create<Product>("products", productData)
       toast({
         title: "Product Added",
         description: `${newProduct.name} has been added successfully.`,
       })
-      setIsDialogOpen(false)
+      setIsProductDialogOpen(false)
       setNewProduct({
         name: "",
         sku: "",
         barcode: "",
         category: "",
+        warehouse: "", 
         price: "",
         minQuantity: "",
         description: "",
+
       })
-      loadData() // Reload products
+      loadData()
     } catch (error) {
       toast({
         title: "Error Adding Product",
-        description: error instanceof Error ? error.message : "Failed to add product",
+        description:
+          error instanceof Error ? error.message : "Failed to add product",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleAddCategory = async () => {
+    if (!canAddCategories) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to add categories",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!newCategory.trim()) return
+
+    setSubmitting(true)
+    try {
+      const categoryData = { name: newCategory.trim() }
+      await api.create<Category>("categories", categoryData)
+
+      toast({
+        title: "Category Added",
+        description: `${newCategory} has been added successfully.`,
+      })
+      setIsCategoryDialogOpen(false)
+      setNewCategory("")
+      loadData()
+    } catch (error) {
+      toast({
+        title: "Error Adding Category",
+        description:
+          error instanceof Error ? error.message : "Failed to add category",
         variant: "destructive",
       })
     } finally {
@@ -136,7 +217,7 @@ export default function Products() {
   }
 
   const handleDeleteProduct = async (id: string) => {
-    if (!hasPermission(['admin', 'manager'])) {
+    if (!hasPermission(["admin", "manager"])) {
       toast({
         title: "Permission Denied",
         description: "You don't have permission to delete products",
@@ -146,7 +227,7 @@ export default function Products() {
     }
 
     try {
-      await api.remove('products', id)
+      await api.remove("products", id)
       toast({
         title: "Product Deleted",
         description: "Product has been deleted successfully",
@@ -155,15 +236,19 @@ export default function Products() {
     } catch (error) {
       toast({
         title: "Error Deleting Product",
-        description: error instanceof Error ? error.message : "Failed to delete product",
+        description:
+          error instanceof Error ? error.message : "Failed to delete product",
         variant: "destructive",
       })
     }
   }
 
   const getStatusBadge = (product: Product) => {
-    // Since we don't have stock data in the product model, show based on existence
-    return <Badge variant="default" className="bg-success text-success-foreground">Available</Badge>
+    return (
+      <Badge variant="default" className="bg-success text-success-foreground">
+        Available
+      </Badge>
+    )
   }
 
   if (loading) {
@@ -181,125 +266,210 @@ export default function Products() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Products</h1>
           <p className="text-muted-foreground">
-            Manage your product inventory and stock levels
+            Manage your product inventory and categories
           </p>
         </div>
-        {canAddProducts && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add Product
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Product</DialogTitle>
-              <DialogDescription>
-                Enter the details for the new product in your inventory.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
+        <div className="flex gap-2">
+          {canAddCategories && (
+            <Dialog
+              open={isCategoryDialogOpen}
+              onOpenChange={setIsCategoryDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <FolderPlus className="w-4 h-4" />
+                  Add Category
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Category</DialogTitle>
+                  <DialogDescription>
+                    Enter the name of the new category
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Label htmlFor="categoryName">Category Name</Label>
                   <Input
-                    id="name"
-                    value={newProduct.name}
-                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                    placeholder="MacBook Pro 16 inch"
+                    id="categoryName"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Electronics"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    value={newProduct.sku}
-                    onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                    placeholder="APL-MBP16-1TB"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">Barcode</Label>
-                  <Input
-                    id="barcode"
-                    value={newProduct.barcode}
-                    onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-                    placeholder="123456789012"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={newProduct.category}
-                    onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCategoryDialogOpen(false)}
+                    disabled={submitting}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category._id} value={category._id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddCategory} disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add Category"
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price ($)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                    placeholder="299.99"
-                  />
+              </DialogContent>
+            </Dialog>
+          )}
+          {canAddProducts && (
+            <Dialog
+              open={isProductDialogOpen}
+              onOpenChange={setIsProductDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Product
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Product</DialogTitle>
+                  <DialogDescription>
+                    Enter the details for the new product in your inventory.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Product Name</Label>
+                      <Input
+                        id="name"
+                        value={newProduct.name}
+                        onChange={(e) =>
+                          setNewProduct({ ...newProduct, name: e.target.value })
+                        }
+                        placeholder="MacBook Pro 16 inch"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sku">SKU</Label>
+                      <Input
+                        id="sku"
+                        value={newProduct.sku}
+                        onChange={(e) =>
+                          setNewProduct({ ...newProduct, sku: e.target.value })
+                        }
+                        placeholder="APL-MBP16-1TB"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="barcode">Barcode</Label>
+                      <Input
+                        id="barcode"
+                        value={newProduct.barcode}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            barcode: e.target.value,
+                          })
+                        }
+                        placeholder="123456789012"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select
+                        value={newProduct.category}
+                        onValueChange={(value) =>
+                          setNewProduct({ ...newProduct, category: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category._id} value={category._id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Price ($)</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        value={newProduct.price}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            price: e.target.value,
+                          })
+                        }
+                        placeholder="299.99"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="minQuantity">Minimum Quantity</Label>
+                      <Input
+                        id="minQuantity"
+                        type="number"
+                        value={newProduct.minQuantity}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            minQuantity: e.target.value,
+                          })
+                        }
+                        placeholder="10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={newProduct.description}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Product description..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="minQuantity">Minimum Quantity</Label>
-                  <Input
-                    id="minQuantity"
-                    type="number"
-                    value={newProduct.minQuantity}
-                    onChange={(e) => setNewProduct({ ...newProduct, minQuantity: e.target.value })}
-                    placeholder="10"
-                  />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsProductDialogOpen(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddProduct} disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add Product"
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  placeholder="Product description..."
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddProduct} disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  "Add Product"
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        )}
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -336,7 +506,10 @@ export default function Products() {
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-success" />
               <div className="text-2xl font-bold">
-                ${products.reduce((sum, p) => sum + p.price, 0).toLocaleString()}
+                $
+                {products
+                  .reduce((sum, p) => sum + p.price, 0)
+                  .toLocaleString()}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Total Inventory Value</p>
@@ -388,25 +561,26 @@ export default function Products() {
               {filteredProducts.map((product) => (
                 <TableRow key={product._id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{product.sku}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {product.sku}
+                  </TableCell>
                   <TableCell>
-                    {categories.find(c => c._id === product.category)?.name || 'N/A'}
+                    {categories.find((c) => c._id === product.category)?.name ||
+                      "N/A"}
                   </TableCell>
                   <TableCell>${product.price.toLocaleString()}</TableCell>
                   <TableCell>N/A</TableCell>
-                  <TableCell>
-                    {getStatusBadge(product)}
-                  </TableCell>
+                  <TableCell>{getStatusBadge(product)}</TableCell>
                   <TableCell className="text-muted-foreground">N/A</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {hasPermission(['admin', 'manager']) && (
+                      {hasPermission(["admin", "manager"]) && (
                         <>
                           <Button variant="ghost" size="sm">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteProduct(product._id)}
                           >
