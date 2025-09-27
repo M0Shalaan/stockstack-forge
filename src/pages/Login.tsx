@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Eye, EyeOff, Settings } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
 import { apiConfig } from "@/lib/api"
@@ -176,6 +176,15 @@ export default function Login() {
               </Button>
             </form>
             <div className="mt-6 space-y-3">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Don't have an account?{" "}
+                  <Link to="/register" className="text-primary hover:underline font-medium">
+                    Create one here
+                  </Link>
+                </p>
+              </div>
+              
               <Button 
                 variant="outline" 
                 className="w-full"
@@ -184,11 +193,6 @@ export default function Login() {
                 <Settings className="w-4 h-4 mr-2" />
                 API Settings
               </Button>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                  Need to register? Contact your system administrator
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
