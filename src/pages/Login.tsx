@@ -7,7 +7,7 @@ import { Package, Eye, EyeOff, Settings } from "lucide-react"
 import { useNavigate, Link } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
-import { apiConfig } from "@/lib/api"
+import { apiConfig } from "../lib/api"
 
 export default function Login() {
   const [email, setEmail] = useState("")

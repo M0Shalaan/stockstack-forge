@@ -7,6 +7,7 @@ export interface IParty extends Document {
   phone?: string;
   address?: string;
 }
+
 const schema = new Schema<IParty>(
   {
     type: { type: String, enum: ['supplier', 'customer'], required: true, index: true },

@@ -26,7 +26,7 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
 };
 
-app.use(cors(corsOptions));
+app.use(cors({ origin: "*"}));
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('combined'));

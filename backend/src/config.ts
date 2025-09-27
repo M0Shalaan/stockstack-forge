@@ -13,3 +13,4 @@ export const config = {
 if (!config.mongoUri) {
   console.warn('MONGO_URI is not set. Set it in .env');
 }
+

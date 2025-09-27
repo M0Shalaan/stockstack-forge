@@ -11,6 +11,7 @@ import { Plus, Search, Edit, Trash2, Warehouse, MapPin, Package, Loader2 } from 
 import { useToast } from "@/hooks/use-toast"
 import { api, apiConfig } from "@/lib/api"
 import { useAuth } from "@/contexts/AuthContext"
+import { useCallback } from "react"
 
 interface WarehouseType {
   _id: string;
@@ -38,14 +39,12 @@ export default function Warehouses() {
     email: "",
     capacity: "",
   })
+  
   const { toast } = useToast()
   const { hasPermission } = useAuth()
 
-  useEffect(() => {
-    loadWarehouses()
-  }, [])
 
-  const loadWarehouses = async () => {
+  const loadWarehouses = useCallback(async () => {
     if (!apiConfig.isConfigured()) {
       toast({
         title: "API Not Configured",
@@ -68,7 +67,11 @@ export default function Warehouses() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    loadWarehouses()
+  }, [loadWarehouses])
 
   const filteredWarehouses = warehouses.filter(warehouse =>
     warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
