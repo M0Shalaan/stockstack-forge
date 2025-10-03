@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -24,16 +24,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Plus,
   Search,
@@ -43,37 +43,44 @@ import {
   AlertTriangle,
   Loader2,
   FolderPlus,
-} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { api, apiConfig } from "@/lib/api"
-import { useAuth } from "@/contexts/AuthContext"
-import warehouse from "./Warehouses"
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { api, apiConfig } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import warehouse from "./Warehouses";
 
 interface Product {
-  _id: string
-  name: string
-  sku: string
-  barcode?: string
-  category?: string
-  price: number
-  minQuantity?: number
-  description?: string
-  imageUrl?: string
+  _id: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  category?: string;
+  price: number;
+  minQuantity?: number;
+  description?: string;
+  imageUrl?: string;
 }
 
 interface Category {
-  _id: string
-  name: string
+  _id: string;
+  name: string;
+}
+
+interface Warehouse {
+  _id: string;
+  name: string;
+  location?: string;
 }
 
 export default function Products() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: "",
     sku: "",
@@ -83,18 +90,18 @@ export default function Products() {
     minQuantity: "",
     description: "",
     warehouse: "",
-  })
-  const [newCategory, setNewCategory] = useState("")
+  });
+  const [newCategory, setNewCategory] = useState("");
 
-  const { toast } = useToast()
-  const { hasPermission } = useAuth()
+  const { toast } = useToast();
+  const { hasPermission } = useAuth();
 
-  const canAddProducts = hasPermission(["admin", "manager"])
-  const canAddCategories = hasPermission(["admin", "manager"])
+  const canAddProducts = hasPermission(["admin", "manager"]);
+  const canAddCategories = hasPermission(["admin", "manager"]);
 
   useEffect(() => {
-    loadData()
-  }, [])
+    loadData();
+  }, []);
 
   const loadData = async () => {
     if (!apiConfig.isConfigured()) {
@@ -102,35 +109,37 @@ export default function Products() {
         title: "API Not Configured",
         description: "Please configure your API settings first",
         variant: "destructive",
-      })
-      setLoading(false)
-      return
+      });
+      setLoading(false);
+      return;
     }
 
     try {
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, warehousesData] = await Promise.all([
         api.list<Product>("products", searchTerm),
         api.list<Category>("categories"),
-      ])
-      setProducts(productsData)
-      setCategories(categoriesData)
+        api.list<Warehouse>("warehouses"),
+      ]);
+      setProducts(productsData);
+      setCategories(categoriesData);
+      setWarehouses(warehousesData);
     } catch (error) {
       toast({
         title: "Error Loading Data",
         description:
           error instanceof Error ? error.message : "Failed to load products",
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
 
   const handleAddProduct = async () => {
     if (!canAddProducts) {
@@ -138,47 +147,46 @@ export default function Products() {
         title: "Permission Denied",
         description: "You don't have permission to add products",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       const productData = {
         ...newProduct,
         price: parseFloat(newProduct.price) || 0,
         minQuantity: parseInt(newProduct.minQuantity) || 0,
-      }
+      };
 
-      await api.create<Product>("products", productData)
+      await api.create<Product>("products", productData);
       toast({
         title: "Product Added",
         description: `${newProduct.name} has been added successfully.`,
-      })
-      setIsProductDialogOpen(false)
+      });
+      setIsProductDialogOpen(false);
       setNewProduct({
         name: "",
         sku: "",
         barcode: "",
         category: "",
-        warehouse: "", 
+        warehouse: "",
         price: "",
         minQuantity: "",
         description: "",
-
-      })
-      loadData()
+      });
+      loadData();
     } catch (error) {
       toast({
         title: "Error Adding Product",
         description:
           error instanceof Error ? error.message : "Failed to add product",
         variant: "destructive",
-      })
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleAddCategory = async () => {
     if (!canAddCategories) {
@@ -186,35 +194,35 @@ export default function Products() {
         title: "Permission Denied",
         description: "You don't have permission to add categories",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (!newCategory.trim()) return
+    if (!newCategory.trim()) return;
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
-      const categoryData = { name: newCategory.trim() }
-      await api.create<Category>("categories", categoryData)
+      const categoryData = { name: newCategory.trim() };
+      await api.create<Category>("categories", categoryData);
 
       toast({
         title: "Category Added",
         description: `${newCategory} has been added successfully.`,
-      })
-      setIsCategoryDialogOpen(false)
-      setNewCategory("")
-      loadData()
+      });
+      setIsCategoryDialogOpen(false);
+      setNewCategory("");
+      loadData();
     } catch (error) {
       toast({
         title: "Error Adding Category",
         description:
           error instanceof Error ? error.message : "Failed to add category",
         variant: "destructive",
-      })
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleDeleteProduct = async (id: string) => {
     if (!hasPermission(["admin", "manager"])) {
@@ -222,41 +230,41 @@ export default function Products() {
         title: "Permission Denied",
         description: "You don't have permission to delete products",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     try {
-      await api.remove("products", id)
+      await api.remove("products", id);
       toast({
         title: "Product Deleted",
         description: "Product has been deleted successfully",
-      })
-      loadData()
+      });
+      loadData();
     } catch (error) {
       toast({
         title: "Error Deleting Product",
         description:
           error instanceof Error ? error.message : "Failed to delete product",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const getStatusBadge = (product: Product) => {
     return (
       <Badge variant="default" className="bg-success text-success-foreground">
         Available
       </Badge>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
-    )
+    );
   }
 
   return (
@@ -396,7 +404,6 @@ export default function Products() {
                           ))}
                         </SelectContent>
                       </Select>
-                      
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -507,12 +514,12 @@ export default function Products() {
               <Package className="h-4 w-4 text-success" />
               <div className="text-2xl font-bold">
                 $
-                {products
-                  .reduce((sum, p) => sum + p.price, 0)
-                  .toLocaleString()}
+                {products.reduce((sum, p) => sum + p.price, 0).toLocaleString()}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Total Inventory Value</p>
+            <p className="text-xs text-muted-foreground">
+              Total Inventory Value
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -565,9 +572,16 @@ export default function Products() {
                     {product.sku}
                   </TableCell>
                   <TableCell>
-                    {categories.find((c) => c._id === product.category)?.name ||
-                      "N/A"}
+                    {categories.find(
+                      (c) =>
+                        String(c._id) ===
+                        (typeof product.category === "object" &&
+                        product.category !== null
+                          ? String((product.category as { _id: string })._id)
+                          : String(product.category))
+                    )?.name || "N/A"}
                   </TableCell>
+
                   <TableCell>${product.price.toLocaleString()}</TableCell>
                   <TableCell>N/A</TableCell>
                   <TableCell>{getStatusBadge(product)}</TableCell>
@@ -597,5 +611,5 @@ export default function Products() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

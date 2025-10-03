@@ -12,6 +12,7 @@ export const config = {
   jwtSecret: get('JWT_SECRET', 'change_me'),
   corsOrigins: get('CORS_ORIGINS', '*')
     .split(',')
+  
     .map((s) => s.trim()),
 };
 
