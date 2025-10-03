@@ -569,7 +569,7 @@ export default function Products() {
                       "N/A"}
                   </TableCell>
                   <TableCell>${product.price.toLocaleString()}</TableCell>
-                  <TableCell>N/A</TableCell>
+                  <TableCell><span className="quantity">{product.minQuantity}</span></TableCell>
                   <TableCell>{getStatusBadge(product)}</TableCell>
                   <TableCell className="text-muted-foreground">N/A</TableCell>
                   <TableCell className="text-right">
