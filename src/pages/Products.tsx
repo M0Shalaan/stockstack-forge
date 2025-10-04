@@ -565,8 +565,14 @@ export default function Products() {
                     {product.sku}
                   </TableCell>
                   <TableCell>
-                    {categories.find((c) => c._id === product.category)?.name ||
-                      "N/A"}
+                  {categories.find(
+                      (c) =>
+                        String(c._id) ===
+                        (typeof product.category === "object" &&
+                        product.category !== null
+                          ? String((product.category as { _id: string })._id)
+                          : String(product.category))
+                    )?.name || "N/A"}
                   </TableCell>
                   <TableCell>${product.price.toLocaleString()}</TableCell>
                   <TableCell><span className="quantity">{product.minQuantity}</span></TableCell>
